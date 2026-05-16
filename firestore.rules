@@ -1,0 +1,11 @@
+// firestore.rules — Firebase Console mein jaake paste karo
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /notes/{noteId} {
+      // Sirf logged-in user apni notes padh aur likh sake
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+    }
+  }
+}
