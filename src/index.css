@@ -1,14 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --ink:     #1a1a2e;
-  --paper:   #f7f4ef;
-  --accent:  #e8622a;
-  --accent2: #2a7de8;
-  --muted:   #8a8580;
-  --card:    #ffffff;
-  --border:  #e8e4dd;
-  --shadow:  0 2px 20px rgba(26,26,46,0.08);
+  --ink:       #1a1a2e;
+  --paper:     #f7f4ef;
+  --accent:    #e8622a;
+  --muted:     #8a8580;
+  --border:    #e8e4dd;
+  --shadow:    0 2px 20px rgba(26,26,46,0.08);
   --shadow-lg: 0 8px 40px rgba(26,26,46,0.15);
 }
 
@@ -22,11 +20,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-
 ::selection { background: var(--accent); color: white; }
 
 .katex-display { overflow-x: auto; padding: 8px 0; }
@@ -40,14 +35,8 @@ body {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-@keyframes slideIn {
-  from { opacity: 0; transform: translateX(-12px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
