@@ -3,7 +3,8 @@ import { addDoc, updateDoc, doc, collection, serverTimestamp } from "firebase/fi
 import { db } from "../firebase";
 import katex from "katex";
 
-const TAGS_LIST = ["Personal", "Work", "Maths", "Physics", "Chemistry", "Ideas", "Todo", "Important"];
+const CLASSES = ["Class 9", "Class 10", "Class 11", "Class 12"];
+const SUBJECTS = ["Maths", "Hindi", "English", "Physics", "Chemistry", "Biology"];
 
 const COLORS = [
   { bg: "#FFFBF0", border: "#F59E0B", name: "Amber" },
@@ -13,6 +14,15 @@ const COLORS = [
   { bg: "#FAF5FF", border: "#A855F7", name: "Violet" },
   { bg: "#FFF7ED", border: "#EA580C", name: "Coral" },
 ];
+
+const SUBJECT_COLORS = {
+  "Maths":     "#3B82F6",
+  "Hindi":     "#F59E0B",
+  "English":   "#22C55E",
+  "Physics":   "#A855F7",
+  "Chemistry": "#F43F5E",
+  "Biology":   "#10B981",
+};
 
 function MathPreview({ text }) {
   const ref = useRef();
@@ -31,48 +41,39 @@ function MathPreview({ text }) {
       return part.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br/>");
     }).join("");
   }, [text]);
-  return <div ref={ref} style={{ lineHeight: 1.8, fontFamily: "'Instrument Serif', serif", fontSize: "0.95rem" }} />;
+  return <div ref={ref} style={{ lineHeight: 1.9, fontFamily: "'Instrument Serif', serif", fontSize: "1rem" }} />;
 }
 
 export default function NoteEditor({ note, user, onClose }) {
-  const [title, setTitle]       = useState(note?.title   || "");
-  const [content, setContent]   = useState(note?.content || "");
-  const [colorIdx, setColorIdx] = useState(note?.colorIdx ?? 0);
-  const [tags, setTags]         = useState(note?.tags    || []);
-  const [tab, setTab]           = useState("write");
-  const [jsonData, setJsonData] = useState(note?.jsonData || null);
-  const [jsonName, setJsonName] = useState(note?.jsonName || "");
+  const [title, setTitle]         = useState(note?.title   || "");
+  const [content, setContent]     = useState(note?.content || "");
+  const [colorIdx, setColorIdx]   = useState(note?.colorIdx ?? 0);
+  const [tab, setTab]             = useState("write");
+  const [selectedClass, setSelectedClass] = useState(note?.className || "");
+  const [selectedSubject, setSelectedSubject] = useState(note?.subject || "");
+  const [jsonData, setJsonData]   = useState(note?.jsonData || null);
+  const [jsonName, setJsonName]   = useState(note?.jsonName || "");
   const [jsonError, setJsonError] = useState("");
-  const [jsonViewMode, setJsonViewMode] = useState("pretty"); // pretty | raw
-  const [saving, setSaving]     = useState(false);
-  const [dragOver, setDragOver] = useState(false);
+  const [jsonViewMode, setJsonViewMode] = useState("pretty");
+  const [saving, setSaving]       = useState(false);
+  const [dragOver, setDragOver]   = useState(false);
   const fileInputRef = useRef();
   const textRef = useRef();
   const c = COLORS[colorIdx];
 
   useEffect(() => { if (tab === "write") textRef.current?.focus(); }, [tab]);
 
-  function toggleTag(t) {
-    setTags(p => p.includes(t) ? p.filter(x => x !== t) : [...p, t]);
-  }
-
-  // Handle JSON file upload — reads as text, stores in Firestore
   function handleJsonFile(file) {
     if (!file) return;
     if (!file.name.endsWith(".json") && file.type !== "application/json") {
-      setJsonError("Sirf .json file allowed hai!");
-      return;
+      setJsonError("Sirf .json file allowed hai!"); return;
     }
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        JSON.parse(e.target.result); // validate
-        setJsonData(e.target.result);
-        setJsonName(file.name);
-        setJsonError("");
-      } catch {
-        setJsonError("Invalid JSON file! Format sahi nahi hai.");
-      }
+        JSON.parse(e.target.result);
+        setJsonData(e.target.result); setJsonName(file.name); setJsonError("");
+      } catch { setJsonError("Invalid JSON file!"); }
     };
     reader.readAsText(file);
   }
@@ -85,16 +86,13 @@ export default function NoteEditor({ note, user, onClose }) {
   function handlePasteJson(text) {
     try {
       JSON.parse(text);
-      setJsonData(text);
-      setJsonName("pasted.json");
-      setJsonError("");
-    } catch {
-      setJsonError("Invalid JSON — pehle check karo!");
-    }
+      setJsonData(text); setJsonName("pasted.json"); setJsonError("");
+    } catch { setJsonError("Invalid JSON!"); }
   }
 
-  function removeJson() {
-    setJsonData(null); setJsonName(""); setJsonError("");
+  function prettyJson() {
+    try { return JSON.stringify(JSON.parse(jsonData), null, 2); }
+    catch { return jsonData; }
   }
 
   async function handleSave() {
@@ -102,7 +100,9 @@ export default function NoteEditor({ note, user, onClose }) {
     setSaving(true);
     try {
       const data = {
-        title, content, colorIdx, tags,
+        title, content, colorIdx,
+        className: selectedClass,
+        subject: selectedSubject,
         jsonData: jsonData || null,
         jsonName: jsonName || null,
         uid: user.uid,
@@ -116,28 +116,19 @@ export default function NoteEditor({ note, user, onClose }) {
       }
       onClose();
     } catch (e) {
-      console.error(e);
       alert("Save mein error: " + e.message);
       setSaving(false);
     }
   }
 
   const tabStyle = (active) => ({
-    padding: "7px 16px",
+    padding: "7px 14px",
     background: active ? "var(--ink)" : "transparent",
     color: active ? "white" : "var(--muted)",
     border: `1.5px solid ${active ? "var(--ink)" : "var(--border)"}`,
-    borderRadius: 10,
-    fontFamily: "'Syne', sans-serif", fontWeight: 700,
-    fontSize: "0.8rem", cursor: "pointer",
-    transition: "all 0.15s", letterSpacing: 0.2,
+    borderRadius: 10, fontFamily: "'Syne', sans-serif",
+    fontWeight: 700, fontSize: "0.78rem", cursor: "pointer", transition: "all 0.15s",
   });
-
-  // Pretty print JSON for display
-  function prettyJson() {
-    try { return JSON.stringify(JSON.parse(jsonData), null, 2); }
-    catch { return jsonData; }
-  }
 
   return (
     <div style={{
@@ -146,48 +137,71 @@ export default function NoteEditor({ note, user, onClose }) {
       backdropFilter: "blur(6px)",
       display: "flex", alignItems: "center", justifyContent: "center",
       zIndex: 1000, padding: 16,
-      animation: "fadeIn 0.2s ease",
     }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
-        background: c.bg,
-        borderRadius: 28, width: "100%", maxWidth: 560,
+        background: c.bg, borderRadius: 28,
+        width: "100%", maxWidth: 560,
         maxHeight: "93vh", overflowY: "auto",
-        boxShadow: `0 20px 60px ${c.border}44, 0 4px 20px rgba(0,0,0,0.2)`,
+        boxShadow: `0 20px 60px ${c.border}44`,
         border: `2px solid ${c.border}66`,
         display: "flex", flexDirection: "column",
-        animation: "popIn 0.25s cubic-bezier(.4,0,.2,1)",
       }}>
-        {/* Header */}
-        <div style={{
-          padding: "22px 24px 0",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
-          <h2 style={{
-            fontFamily: "'Instrument Serif', serif", fontStyle: "italic",
-            fontSize: "1.4rem", fontWeight: 400,
-            color: c.border,
-          }}>{note ? "Edit Note" : "Naya Note"}</h2>
-          <button onClick={onClose} style={{
-            background: "none", border: "none", cursor: "pointer",
-            fontSize: 24, color: "var(--muted)", lineHeight: 1, padding: 4,
-          }}>×</button>
+        <div style={{ padding: "20px 24px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h2 style={{ fontFamily: "'Instrument Serif', serif", fontStyle: "italic", fontSize: "1.3rem", fontWeight: 400, color: c.border }}>
+            {note ? "Edit Note" : "Naya Note"}
+          </h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 24, color: "var(--muted)" }}>×</button>
         </div>
 
-        <div style={{ padding: "18px 24px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
 
-          {/* Title input */}
-          <input
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="Title..."
+          {/* Title */}
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Title..."
             style={{
-              border: `1.5px solid ${c.border}55`, borderRadius: 14,
-              padding: "10px 14px",
-              fontFamily: "'Syne', sans-serif", fontWeight: 700,
-              fontSize: "1rem", background: "rgba(255,255,255,0.7)",
-              outline: "none", color: "var(--ink)",
+              border: `1.5px solid ${c.border}55`, borderRadius: 14, padding: "10px 14px",
+              fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "1rem",
+              background: "rgba(255,255,255,0.7)", outline: "none", color: "var(--ink)",
             }}
           />
+
+          {/* Class selector */}
+          <div>
+            <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--muted)", marginBottom: 6, letterSpacing: 0.5 }}>🏫 CLASS SELECT KARO</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {CLASSES.map(cls => (
+                <button key={cls} onClick={() => setSelectedClass(selectedClass === cls ? "" : cls)} style={{
+                  flex: 1,
+                  background: selectedClass === cls ? "var(--ink)" : "rgba(255,255,255,0.6)",
+                  color: selectedClass === cls ? "white" : "var(--ink)",
+                  border: `1.5px solid ${selectedClass === cls ? "var(--ink)" : "var(--border)"}`,
+                  borderRadius: 12, padding: "9px",
+                  fontFamily: "'Syne', sans-serif", fontWeight: 800,
+                  fontSize: "0.88rem", cursor: "pointer", transition: "all 0.15s",
+                }}>{cls}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Subject selector */}
+          <div>
+            <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--muted)", marginBottom: 6, letterSpacing: 0.5 }}>📚 SUBJECT SELECT KARO</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+              {SUBJECTS.map(sub => {
+                const subColor = SUBJECT_COLORS[sub];
+                const active = selectedSubject === sub;
+                return (
+                  <button key={sub} onClick={() => setSelectedSubject(active ? "" : sub)} style={{
+                    background: active ? subColor : "rgba(255,255,255,0.6)",
+                    color: active ? "white" : subColor,
+                    border: `1.5px solid ${subColor}`,
+                    borderRadius: 20, padding: "6px 16px",
+                    fontFamily: "'Syne', sans-serif", fontWeight: 800,
+                    fontSize: "0.82rem", cursor: "pointer", transition: "all 0.15s",
+                  }}>{sub}</button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Tabs */}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -195,54 +209,41 @@ export default function NoteEditor({ note, user, onClose }) {
               <button key={id} onClick={() => setTab(id)} style={tabStyle(tab === id)}>
                 {label}
                 {id === "json" && jsonData && (
-                  <span style={{
-                    marginLeft: 5, background: c.border, color: "white",
-                    borderRadius: 20, padding: "0 6px", fontSize: "0.68rem",
-                  }}>✓</span>
+                  <span style={{ marginLeft: 5, background: c.border, color: "white", borderRadius: 20, padding: "0 6px", fontSize: "0.68rem" }}>✓</span>
                 )}
               </button>
             ))}
           </div>
 
-          {/* ── Write Tab ── */}
+          {/* Write Tab */}
           {tab === "write" && (
             <>
-              <textarea
-                ref={textRef}
-                value={content}
-                onChange={e => setContent(e.target.value)}
-                placeholder={"Likho kuch...\n\nInline math:  $x^2 + y^2 = r^2$\n\nBlock math:\n$$\\int_0^\\infty e^{-x}\\,dx = 1$$\n\n$$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$"}
-                rows={9}
-                style={{
-                  border: `1.5px solid ${c.border}55`, borderRadius: 14,
-                  padding: "12px 14px",
+              <textarea ref={textRef} value={content} onChange={e => setContent(e.target.value)}
+                placeholder={"Yahan likho...\nInline math: $x^2$\nBlock math: $$\\frac{a}{b}$$"}
+                rows={9} style={{
+                  border: `1.5px solid ${c.border}55`, borderRadius: 14, padding: "12px 14px",
                   fontFamily: "'JetBrains Mono', monospace", fontSize: "0.88rem",
-                  background: "rgba(255,255,255,0.7)",
-                  outline: "none", resize: "vertical",
-                  color: "var(--ink)", lineHeight: 1.7,
+                  background: "rgba(255,255,255,0.7)", outline: "none",
+                  resize: "vertical", color: "var(--ink)", lineHeight: 1.7,
                 }}
               />
               <div style={{
-                background: "rgba(255,255,255,0.5)",
-                border: `1px dashed ${c.border}55`,
-                borderRadius: 12, padding: "10px 14px",
+                background: "rgba(255,255,255,0.5)", border: `1px dashed ${c.border}55`,
+                borderRadius: 12, padding: "9px 14px",
                 fontSize: "0.73rem", color: "var(--muted)",
-                fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.7,
+                fontFamily: "'JetBrains Mono', monospace",
               }}>
-                💡 <b>KaTeX:</b> &nbsp;
-                Inline → <code>$formula$</code> &nbsp;·&nbsp;
-                Block → <code>$$formula$$</code>
+                💡 Inline: <code>$formula$</code> · Block: <code>$$formula$$</code>
               </div>
             </>
           )}
 
-          {/* ── Preview Tab ── */}
+          {/* Preview Tab */}
           {tab === "preview" && (
             <div style={{
-              minHeight: 160,
-              border: `1.5px solid ${c.border}44`,
+              minHeight: 160, border: `1.5px solid ${c.border}44`,
               borderRadius: 14, padding: "14px 16px",
-              background: "rgba(255,255,255,0.8)", lineHeight: 1.8,
+              background: "rgba(255,255,255,0.8)",
             }}>
               {(content || title)
                 ? <MathPreview text={content || title} />
@@ -251,112 +252,50 @@ export default function NoteEditor({ note, user, onClose }) {
             </div>
           )}
 
-          {/* ── JSON Tab ── */}
+          {/* JSON Tab */}
           {tab === "json" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {!jsonData ? (
                 <>
-                  {/* Drop zone */}
-                  <div
-                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={handleDrop}
+                  <div onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)} onDrop={handleDrop}
                     onClick={() => fileInputRef.current?.click()}
                     style={{
                       border: `2px dashed ${dragOver ? c.border : c.border + "66"}`,
-                      borderRadius: 16, padding: "36px 20px",
-                      textAlign: "center", cursor: "pointer",
+                      borderRadius: 16, padding: "32px 20px", textAlign: "center", cursor: "pointer",
                       background: dragOver ? c.border + "11" : "rgba(255,255,255,0.5)",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    <div style={{ fontSize: 40, marginBottom: 10 }}>{dragOver ? "⬇️" : "📋"}</div>
-                    <div style={{ fontWeight: 800, fontSize: "0.9rem", color: c.border }}>
-                      JSON file drag karo ya click karo
-                    </div>
-                    <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: 4 }}>
-                      Sirf .json files · FREE (Firestore mein save hoga)
-                    </div>
-                    <input ref={fileInputRef} type="file" accept=".json,application/json"
-                      onChange={e => handleJsonFile(e.target.files[0])}
-                      style={{ display: "none" }}
-                    />
+                    }}>
+                    <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
+                    <div style={{ fontWeight: 800, color: c.border }}>JSON file drag karo ya click karo</div>
+                    <input ref={fileInputRef} type="file" accept=".json" onChange={e => handleJsonFile(e.target.files[0])} style={{ display: "none" }} />
                   </div>
-
-                  {/* OR paste */}
                   <div style={{ textAlign: "center", color: "var(--muted)", fontSize: "0.8rem", fontWeight: 700 }}>— YA —</div>
-                  <textarea
-                    placeholder={'JSON yahan paste karo...\n{\n  "key": "value"\n}'}
-                    rows={5}
-                    onChange={e => {
-                      if (e.target.value.trim()) handlePasteJson(e.target.value.trim());
-                    }}
-                    style={{
-                      border: `1.5px solid ${c.border}55`, borderRadius: 14,
-                      padding: "11px 14px",
-                      fontFamily: "'JetBrains Mono', monospace", fontSize: "0.82rem",
-                      background: "rgba(255,255,255,0.7)",
-                      outline: "none", resize: "vertical", color: "var(--ink)",
-                    }}
+                  <textarea placeholder="JSON paste karo..." rows={4}
+                    onChange={e => { if (e.target.value.trim()) handlePasteJson(e.target.value.trim()); }}
+                    style={{ border: `1.5px solid ${c.border}55`, borderRadius: 14, padding: "11px 14px", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.82rem", background: "rgba(255,255,255,0.7)", outline: "none", resize: "vertical" }}
                   />
-
-                  {jsonError && (
-                    <div style={{
-                      background: "#fee2e2", border: "1px solid #fca5a5",
-                      borderRadius: 10, padding: "9px 14px",
-                      fontSize: "0.8rem", color: "#dc2626", fontWeight: 700,
-                    }}>⚠️ {jsonError}</div>
-                  )}
+                  {jsonError && <div style={{ background: "#fee2e2", borderRadius: 10, padding: "9px 14px", fontSize: "0.8rem", color: "#dc2626", fontWeight: 700 }}>⚠️ {jsonError}</div>}
                 </>
               ) : (
-                // JSON loaded — show preview
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    background: "rgba(255,255,255,0.8)",
-                    border: `1px solid ${c.border}55`,
-                    borderRadius: 12, padding: "10px 14px",
-                  }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.8)", border: `1px solid ${c.border}55`, borderRadius: 12, padding: "10px 14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontSize: 22 }}>📋</span>
                       <div>
                         <div style={{ fontWeight: 800, fontSize: "0.85rem" }}>{jsonName}</div>
-                        <div style={{ fontSize: "0.7rem", color: "var(--muted)" }}>
-                          {(jsonData.length / 1024).toFixed(1)} KB · Firestore mein save hoga ✓
-                        </div>
+                        <div style={{ fontSize: "0.7rem", color: "var(--muted)" }}>{(jsonData.length / 1024).toFixed(1)} KB</div>
                       </div>
                     </div>
-                    <button onClick={removeJson} style={{
-                      background: "#fee2e2", border: "1px solid #fca5a5",
-                      borderRadius: 8, padding: "5px 9px",
-                      cursor: "pointer", fontSize: 13,
-                    }}>🗑 Hata do</button>
+                    <button onClick={() => { setJsonData(null); setJsonName(""); }} style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "5px 9px", cursor: "pointer", fontSize: 13 }}>🗑</button>
                   </div>
-
-                  {/* Toggle view */}
                   <div style={{ display: "flex", gap: 6 }}>
-                    {["pretty", "raw"].map(m => (
-                      <button key={m} onClick={() => setJsonViewMode(m)} style={{
-                        padding: "4px 12px",
-                        background: jsonViewMode === m ? c.border : "rgba(255,255,255,0.5)",
-                        color: jsonViewMode === m ? "white" : c.border,
-                        border: `1px solid ${c.border}`,
-                        borderRadius: 8, fontSize: "0.75rem",
-                        fontWeight: 700, cursor: "pointer",
-                      }}>{m === "pretty" ? "🎨 Pretty" : "📄 Raw"}</button>
+                    {["pretty","raw"].map(m => (
+                      <button key={m} onClick={() => setJsonViewMode(m)} style={{ padding: "4px 12px", background: jsonViewMode === m ? c.border : "rgba(255,255,255,0.5)", color: jsonViewMode === m ? "white" : c.border, border: `1px solid ${c.border}`, borderRadius: 8, fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>
+                        {m === "pretty" ? "🎨 Pretty" : "📄 Raw"}
+                      </button>
                     ))}
                   </div>
-
-                  <pre style={{
-                    background: "rgba(26,26,46,0.04)",
-                    border: `1px solid ${c.border}44`,
-                    borderRadius: 12, padding: "12px 14px",
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: "0.78rem", color: "var(--ink)",
-                    maxHeight: 220, overflowY: "auto",
-                    whiteSpace: "pre-wrap", wordBreak: "break-all",
-                    lineHeight: 1.6,
-                  }}>
+                  <pre style={{ background: "rgba(26,26,46,0.04)", border: `1px solid ${c.border}44`, borderRadius: 12, padding: "12px 14px", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.78rem", maxHeight: 200, overflowY: "auto", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
                     {jsonViewMode === "pretty" ? prettyJson() : jsonData}
                   </pre>
                 </div>
@@ -368,47 +307,25 @@ export default function NoteEditor({ note, user, onClose }) {
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <span style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 700 }}>Rang:</span>
             {COLORS.map((col, i) => (
-              <button key={i} title={col.name} onClick={() => setColorIdx(i)} style={{
-                width: 24, height: 24, borderRadius: "50%",
-                background: col.bg,
+              <button key={i} onClick={() => setColorIdx(i)} style={{
+                width: 24, height: 24, borderRadius: "50%", background: col.bg,
                 border: i === colorIdx ? `3px solid ${col.border}` : `2px solid ${col.border}88`,
-                cursor: "pointer",
-                transform: i === colorIdx ? "scale(1.3)" : "scale(1)",
+                cursor: "pointer", transform: i === colorIdx ? "scale(1.3)" : "scale(1)",
                 transition: "transform 0.15s",
               }} />
-            ))}
-          </div>
-
-          {/* Tags */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {TAGS_LIST.map(t => (
-              <button key={t} onClick={() => toggleTag(t)} style={{
-                background: tags.includes(t) ? c.border : "rgba(255,255,255,0.6)",
-                color: tags.includes(t) ? "white" : c.border,
-                border: `1.5px solid ${c.border}99`,
-                borderRadius: 20, padding: "4px 12px",
-                fontSize: "0.75rem", fontWeight: 800,
-                cursor: "pointer", transition: "all 0.15s",
-                fontFamily: "'Syne', sans-serif",
-              }}>#{t}</button>
             ))}
           </div>
 
           {/* Save */}
           <button onClick={handleSave} disabled={saving} style={{
             background: saving ? "var(--muted)" : `linear-gradient(135deg, ${c.border}, ${c.border}bb)`,
-            color: "white", border: "none", borderRadius: 14,
-            padding: "13px", fontFamily: "'Syne', sans-serif",
-            fontWeight: 800, fontSize: "0.97rem",
+            color: "white", border: "none", borderRadius: 14, padding: "13px",
+            fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "0.97rem",
             cursor: saving ? "not-allowed" : "pointer",
             boxShadow: `0 4px 20px ${c.border}44`,
-            transition: "all 0.2s",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           }}>
-            {saving
-              ? <><span style={{ animation: "spin 0.8s linear infinite", display: "inline-block" }}>⟳</span> Saving...</>
-              : "💾 Save Karo"
-            }
+            {saving ? <><span style={{ animation: "spin 0.8s linear infinite", display: "inline-block" }}>⟳</span> Saving...</> : "💾 Save Karo"}
           </button>
         </div>
       </div>
