@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import Auth from "./components/Auth";
 import NoteCard from "./components/NoteCard";
@@ -32,8 +32,7 @@ export default function App() {
     setLoading(true);
     const q = query(
       collection(db, "notes"),
-      where("uid", "==", user.uid),
-      orderBy("updatedAt", "desc")
+      where("uid", "==", user.uid)
     );
     const unsub = onSnapshot(q, snap => {
       setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
