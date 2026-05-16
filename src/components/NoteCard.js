@@ -44,14 +44,16 @@ export default function NoteCard({ note, onEdit }) {
     }
   }, [note.content]);
 
-  async function handleDelete() {
+  async function handleDelete(e) {
+    e.stopPropagation();
     if (!window.confirm("Note delete karna chahte ho?")) return;
     setDeleting(true);
     try { await deleteDoc(doc(db, "notes", note.id)); }
     catch (e) { console.error(e); setDeleting(false); }
   }
 
-  async function handlePin() {
+  async function handlePin(e) {
+    e.stopPropagation();
     await updateDoc(doc(db, "notes", note.id), { pinned: !note.pinned });
   }
 
@@ -63,6 +65,7 @@ export default function NoteCard({ note, onEdit }) {
     <div
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
+      onClick={() => onEdit(note)}
       style={{
         background: c.bg,
         border: `2px solid ${hov ? c.border : "transparent"}`,
@@ -75,9 +78,9 @@ export default function NoteCard({ note, onEdit }) {
         breakInside: "avoid", marginBottom: 14,
         opacity: deleting ? 0.4 : 1,
         animation: "fadeUp 0.3s ease",
+        cursor: "pointer",
       }}
     >
-      {/* Pinned badge */}
       {note.pinned && (
         <div style={{
           position: "absolute", top: -9, right: 14,
@@ -87,7 +90,6 @@ export default function NoteCard({ note, onEdit }) {
         }}>📌 PINNED</div>
       )}
 
-      {/* Action buttons */}
       <div style={{
         position: "absolute", top: 10, right: 10,
         display: "flex", gap: 4,
@@ -95,7 +97,7 @@ export default function NoteCard({ note, onEdit }) {
       }}>
         {[
           { icon: note.pinned ? "📌" : "🖇", fn: handlePin, title: "Pin" },
-          { icon: "✏️", fn: () => onEdit(note), title: "Edit" },
+          { icon: "✏️", fn: (e) => { e.stopPropagation(); onEdit(note); }, title: "Edit" },
           { icon: "🗑", fn: handleDelete, title: "Delete", danger: true },
         ].map((b, i) => (
           <button key={i} onClick={b.fn} title={b.title} style={{
@@ -103,15 +105,10 @@ export default function NoteCard({ note, onEdit }) {
             border: `1px solid ${b.danger ? "#fca5a5" : "#e5e7eb"}`,
             borderRadius: 9, padding: "4px 7px",
             cursor: "pointer", fontSize: 14, lineHeight: 1,
-            transition: "transform 0.1s",
-          }}
-            onMouseEnter={e => e.currentTarget.style.transform = "scale(1.15)"}
-            onMouseLeave={e => e.currentTarget.style.transform = ""}
-          >{b.icon}</button>
+          }}>{b.icon}</button>
         ))}
       </div>
 
-      {/* Title */}
       {note.title && (
         <div style={{
           fontFamily: "'Syne', sans-serif", fontWeight: 800,
@@ -120,7 +117,6 @@ export default function NoteCard({ note, onEdit }) {
         }}>{note.title}</div>
       )}
 
-      {/* Math content */}
       <div ref={contentRef} style={{
         fontFamily: "'Instrument Serif', serif",
         fontSize: "0.93rem", color: "var(--ink)",
@@ -128,26 +124,20 @@ export default function NoteCard({ note, onEdit }) {
         maskImage: "linear-gradient(to bottom, black 75%, transparent 100%)",
       }} />
 
-      {/* JSON attachment badge */}
       {note.jsonData && (
-        <div
-          onClick={() => onEdit(note)}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            background: "rgba(255,255,255,0.8)",
-            border: `1px solid ${c.border}66`,
-            borderRadius: 10, padding: "5px 10px",
-            fontSize: "0.74rem",
-            fontFamily: "'JetBrains Mono', monospace",
-            color: c.border, cursor: "pointer",
-            fontWeight: 500, width: "fit-content",
-          }}
-        >
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          background: "rgba(255,255,255,0.8)",
+          border: `1px solid ${c.border}66`,
+          borderRadius: 10, padding: "5px 10px",
+          fontSize: "0.74rem",
+          fontFamily: "'JetBrains Mono', monospace",
+          color: c.border, fontWeight: 500, width: "fit-content",
+        }}>
           📋 {note.jsonName || "data.json"} · {(note.jsonData.length / 1024).toFixed(1)} KB
         </div>
       )}
 
-      {/* Tags */}
       {note.tags?.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
           {note.tags.map(t => (
@@ -160,11 +150,10 @@ export default function NoteCard({ note, onEdit }) {
         </div>
       )}
 
-      {/* Date */}
       <div style={{
         fontSize: "0.68rem", color: "var(--muted)",
         fontFamily: "'JetBrains Mono', monospace",
       }}>{timeStr}</div>
     </div>
   );
-}
+            }
