@@ -1,8 +1,6 @@
-// src/components/NoteEditor.js
 import { useState, useRef, useEffect } from "react";
 import { addDoc, updateDoc, doc, collection, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../firebase";
+import { db } from "../firebase";
 import katex from "katex";
 
 const TAGS_LIST = ["Personal", "Work", "Maths", "Physics", "Chemistry", "Ideas", "Todo", "Important"];
@@ -19,15 +17,15 @@ const COLORS = [
 function MathPreview({ text }) {
   const ref = useRef();
   useEffect(() => {
-    if (!ref.current) return;
-    const parts = (text || "").split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g);
+    if (!ref.current || !text) return;
+    const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g);
     ref.current.innerHTML = parts.map(part => {
       if (part.startsWith("$$") && part.endsWith("$$")) {
-        try { return `<div style="margin:8px 0">${katex.renderToString(part.slice(2,-2), { displayMode: true, throwOnError: false })}</div>`; }
+        try { return `<div style="margin:8px 0;overflow-x:auto">${katex.renderToString(part.slice(2, -2), { displayMode: true, throwOnError: false })}</div>`; }
         catch { return part; }
       }
       if (part.startsWith("$") && part.endsWith("$")) {
-        try { return katex.renderToString(part.slice(1,-1), { throwOnError: false }); }
+        try { return katex.renderToString(part.slice(1, -1), { throwOnError: false }); }
         catch { return part; }
       }
       return part.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br/>");
@@ -41,71 +39,72 @@ export default function NoteEditor({ note, user, onClose }) {
   const [content, setContent]   = useState(note?.content || "");
   const [colorIdx, setColorIdx] = useState(note?.colorIdx ?? 0);
   const [tags, setTags]         = useState(note?.tags    || []);
-  const [tab, setTab]           = useState("write"); // write | preview | attach
-  const [files, setFiles]       = useState([]);           // new files to upload
-  const [existingAtts, setExistingAtts] = useState(note?.attachments || []);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress]   = useState({});
-  const [saving, setSaving]       = useState(false);
-  const [dragOver, setDragOver]   = useState(false);
+  const [tab, setTab]           = useState("write");
+  const [jsonData, setJsonData] = useState(note?.jsonData || null);
+  const [jsonName, setJsonName] = useState(note?.jsonName || "");
+  const [jsonError, setJsonError] = useState("");
+  const [jsonViewMode, setJsonViewMode] = useState("pretty"); // pretty | raw
+  const [saving, setSaving]     = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef();
+  const textRef = useRef();
   const c = COLORS[colorIdx];
+
+  useEffect(() => { if (tab === "write") textRef.current?.focus(); }, [tab]);
 
   function toggleTag(t) {
     setTags(p => p.includes(t) ? p.filter(x => x !== t) : [...p, t]);
   }
 
-  function handleFileDrop(e) {
-    e.preventDefault(); setDragOver(false);
-    const dropped = Array.from(e.dataTransfer.files);
-    setFiles(p => [...p, ...dropped]);
-  }
-
-  function handleFileInput(e) {
-    setFiles(p => [...p, ...Array.from(e.target.files)]);
-  }
-
-  function removeNewFile(i) {
-    setFiles(p => p.filter((_,j) => j !== i));
-  }
-
-  function removeExisting(i) {
-    setExistingAtts(p => p.filter((_,j) => j !== i));
-  }
-
-  async function uploadFiles() {
-    if (!files.length) return [];
-    const results = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const storageRef = ref(storage, `notes/${user.uid}/${Date.now()}_${file.name}`);
-      await new Promise((res, rej) => {
-        const task = uploadBytesResumable(storageRef, file);
-        task.on("state_changed",
-          snap => setProgress(p => ({ ...p, [i]: Math.round(snap.bytesTransferred / snap.totalBytes * 100) })),
-          rej,
-          async () => {
-            const url = await getDownloadURL(task.snapshot.ref);
-            results.push({ name: file.name, url, type: file.type, size: file.size });
-            res();
-          }
-        );
-      });
+  // Handle JSON file upload — reads as text, stores in Firestore
+  function handleJsonFile(file) {
+    if (!file) return;
+    if (!file.name.endsWith(".json") && file.type !== "application/json") {
+      setJsonError("Sirf .json file allowed hai!");
+      return;
     }
-    return results;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        JSON.parse(e.target.result); // validate
+        setJsonData(e.target.result);
+        setJsonName(file.name);
+        setJsonError("");
+      } catch {
+        setJsonError("Invalid JSON file! Format sahi nahi hai.");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function handleDrop(e) {
+    e.preventDefault(); setDragOver(false);
+    handleJsonFile(e.dataTransfer.files[0]);
+  }
+
+  function handlePasteJson(text) {
+    try {
+      JSON.parse(text);
+      setJsonData(text);
+      setJsonName("pasted.json");
+      setJsonError("");
+    } catch {
+      setJsonError("Invalid JSON — pehle check karo!");
+    }
+  }
+
+  function removeJson() {
+    setJsonData(null); setJsonName(""); setJsonError("");
   }
 
   async function handleSave() {
     if (!content.trim() && !title.trim()) return;
     setSaving(true);
     try {
-      setUploading(true);
-      const newUploaded = await uploadFiles();
-      setUploading(false);
-      const allAttachments = [...existingAtts, ...newUploaded];
       const data = {
         title, content, colorIdx, tags,
-        attachments: allAttachments,
+        jsonData: jsonData || null,
+        jsonName: jsonName || null,
         uid: user.uid,
         updatedAt: serverTimestamp(),
         pinned: note?.pinned || false,
@@ -118,43 +117,32 @@ export default function NoteEditor({ note, user, onClose }) {
       onClose();
     } catch (e) {
       console.error(e);
+      alert("Save mein error: " + e.message);
       setSaving(false);
-      setUploading(false);
     }
   }
 
-  const fileIcon = (type) => {
-    if (!type) return "📎";
-    if (type.startsWith("image/")) return "🖼";
-    if (type === "application/pdf") return "📄";
-    if (type.includes("json")) return "📋";
-    return "📎";
-  };
-
-  const formatBytes = (b) => {
-    if (b < 1024) return b + " B";
-    if (b < 1024*1024) return (b/1024).toFixed(1) + " KB";
-    return (b/1024/1024).toFixed(1) + " MB";
-  };
-
   const tabStyle = (active) => ({
-    padding: "7px 18px",
+    padding: "7px 16px",
     background: active ? "var(--ink)" : "transparent",
     color: active ? "white" : "var(--muted)",
-    border: "1.5px solid " + (active ? "var(--ink)" : "var(--border)"),
+    border: `1.5px solid ${active ? "var(--ink)" : "var(--border)"}`,
     borderRadius: 10,
-    fontFamily: "'Syne', sans-serif",
-    fontWeight: 700,
-    fontSize: "0.82rem",
-    cursor: "pointer",
-    transition: "all 0.15s",
-    letterSpacing: 0.2,
+    fontFamily: "'Syne', sans-serif", fontWeight: 700,
+    fontSize: "0.8rem", cursor: "pointer",
+    transition: "all 0.15s", letterSpacing: 0.2,
   });
+
+  // Pretty print JSON for display
+  function prettyJson() {
+    try { return JSON.stringify(JSON.parse(jsonData), null, 2); }
+    catch { return jsonData; }
+  }
 
   return (
     <div style={{
       position: "fixed", inset: 0,
-      background: "rgba(26,26,46,0.6)",
+      background: "rgba(26,26,46,0.65)",
       backdropFilter: "blur(6px)",
       display: "flex", alignItems: "center", justifyContent: "center",
       zIndex: 1000, padding: 16,
@@ -162,14 +150,12 @@ export default function NoteEditor({ note, user, onClose }) {
     }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         background: c.bg,
-        borderRadius: 28,
-        width: "100%", maxWidth: 560,
-        maxHeight: "92vh",
-        overflowY: "auto",
+        borderRadius: 28, width: "100%", maxWidth: 560,
+        maxHeight: "93vh", overflowY: "auto",
         boxShadow: `0 20px 60px ${c.border}44, 0 4px 20px rgba(0,0,0,0.2)`,
         border: `2px solid ${c.border}66`,
         display: "flex", flexDirection: "column",
-        animation: "fadeUp 0.25s cubic-bezier(.4,0,.2,1)",
+        animation: "popIn 0.25s cubic-bezier(.4,0,.2,1)",
       }}>
         {/* Header */}
         <div style={{
@@ -177,62 +163,60 @@ export default function NoteEditor({ note, user, onClose }) {
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
           <h2 style={{
-            fontFamily: "'Syne', sans-serif",
-            fontSize: "1.15rem", fontWeight: 900,
-            color: c.border, letterSpacing: -0.3,
-          }}>
-            {note ? "✏️ Edit Note" : "✨ Naya Note"}
-          </h2>
+            fontFamily: "'Instrument Serif', serif", fontStyle: "italic",
+            fontSize: "1.4rem", fontWeight: 400,
+            color: c.border,
+          }}>{note ? "Edit Note" : "Naya Note"}</h2>
           <button onClick={onClose} style={{
             background: "none", border: "none", cursor: "pointer",
-            fontSize: 22, color: "var(--muted)", lineHeight: 1,
-            padding: 4,
+            fontSize: 24, color: "var(--muted)", lineHeight: 1, padding: 4,
           }}>×</button>
         </div>
 
-        <div style={{ padding: "18px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* Title */}
+        <div style={{ padding: "18px 24px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+          {/* Title input */}
           <input
             value={title}
             onChange={e => setTitle(e.target.value)}
             placeholder="Title..."
             style={{
-              border: `1.5px solid ${c.border}55`,
-              borderRadius: 14, padding: "10px 14px",
-              fontFamily: "'Syne', sans-serif",
-              fontWeight: 700, fontSize: "1rem",
-              background: "rgba(255,255,255,0.7)",
+              border: `1.5px solid ${c.border}55`, borderRadius: 14,
+              padding: "10px 14px",
+              fontFamily: "'Syne', sans-serif", fontWeight: 700,
+              fontSize: "1rem", background: "rgba(255,255,255,0.7)",
               outline: "none", color: "var(--ink)",
             }}
           />
 
           {/* Tabs */}
-          <div style={{ display: "flex", gap: 6 }}>
-            {[["write","✍️ Write"],["preview","👁 Preview"],["attach","📎 Files"]].map(([id, label]) => (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {[["write","✍️ Write"], ["preview","👁 Preview"], ["json","📋 JSON"]].map(([id, label]) => (
               <button key={id} onClick={() => setTab(id)} style={tabStyle(tab === id)}>
-                {label} {id === "attach" && (files.length + existingAtts.length) > 0 &&
-                  <span style={{ marginLeft: 4, background: c.border, color: "white", borderRadius: 20, padding: "0 6px", fontSize: "0.7rem" }}>
-                    {files.length + existingAtts.length}
-                  </span>
-                }
+                {label}
+                {id === "json" && jsonData && (
+                  <span style={{
+                    marginLeft: 5, background: c.border, color: "white",
+                    borderRadius: 20, padding: "0 6px", fontSize: "0.68rem",
+                  }}>✓</span>
+                )}
               </button>
             ))}
           </div>
 
-          {/* Write Tab */}
+          {/* ── Write Tab ── */}
           {tab === "write" && (
             <>
               <textarea
-                autoFocus
+                ref={textRef}
                 value={content}
                 onChange={e => setContent(e.target.value)}
-                placeholder={"Likho kuch...\n\nInline math:  $x^2 + y^2 = r^2$\nBlock math:\n$$\\int_0^\\infty e^{-x}\\,dx = 1$$\n\n$$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$"}
+                placeholder={"Likho kuch...\n\nInline math:  $x^2 + y^2 = r^2$\n\nBlock math:\n$$\\int_0^\\infty e^{-x}\\,dx = 1$$\n\n$$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$"}
                 rows={9}
                 style={{
-                  border: `1.5px solid ${c.border}55`,
-                  borderRadius: 14, padding: "12px 14px",
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: "0.88rem",
+                  border: `1.5px solid ${c.border}55`, borderRadius: 14,
+                  padding: "12px 14px",
+                  fontFamily: "'JetBrains Mono', monospace", fontSize: "0.88rem",
                   background: "rgba(255,255,255,0.7)",
                   outline: "none", resize: "vertical",
                   color: "var(--ink)", lineHeight: 1.7,
@@ -242,25 +226,23 @@ export default function NoteEditor({ note, user, onClose }) {
                 background: "rgba(255,255,255,0.5)",
                 border: `1px dashed ${c.border}55`,
                 borderRadius: 12, padding: "10px 14px",
-                fontSize: "0.74rem", color: "var(--muted)",
-                fontFamily: "'JetBrains Mono', monospace",
-                lineHeight: 1.7,
+                fontSize: "0.73rem", color: "var(--muted)",
+                fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.7,
               }}>
-                💡 <b>KaTeX shortcuts:</b><br/>
-                Inline: <code>$formula$</code> &nbsp;·&nbsp; Block: <code>$$formula$$</code><br/>
-                e.g. <code>$\sqrt{{x^2+y^2}}$</code> · <code>$$\sum_{{n=1}}^\infty \frac{{1}}{{n^2}}$$</code>
+                💡 <b>KaTeX:</b> &nbsp;
+                Inline → <code>$formula$</code> &nbsp;·&nbsp;
+                Block → <code>$$formula$$</code>
               </div>
             </>
           )}
 
-          {/* Preview Tab */}
+          {/* ── Preview Tab ── */}
           {tab === "preview" && (
             <div style={{
-              minHeight: 180,
+              minHeight: 160,
               border: `1.5px solid ${c.border}44`,
               borderRadius: 14, padding: "14px 16px",
-              background: "rgba(255,255,255,0.8)",
-              lineHeight: 1.75,
+              background: "rgba(255,255,255,0.8)", lineHeight: 1.8,
             }}>
               {(content || title)
                 ? <MathPreview text={content || title} />
@@ -269,96 +251,116 @@ export default function NoteEditor({ note, user, onClose }) {
             </div>
           )}
 
-          {/* Attach Tab */}
-          {tab === "attach" && (
+          {/* ── JSON Tab ── */}
+          {tab === "json" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {/* Drop zone */}
-              <div
-                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleFileDrop}
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  border: `2px dashed ${dragOver ? c.border : c.border + "66"}`,
-                  borderRadius: 16,
-                  padding: "32px 20px",
-                  textAlign: "center",
-                  cursor: "pointer",
-                  background: dragOver ? c.border + "11" : "rgba(255,255,255,0.5)",
-                  transition: "all 0.2s",
-                }}
-              >
-                <div style={{ fontSize: 36, marginBottom: 8 }}>
-                  {dragOver ? "⬇️" : "📁"}
-                </div>
-                <div style={{ fontWeight: 800, fontSize: "0.9rem", color: c.border }}>
-                  Drag & drop karo ya click karo
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: 4 }}>
-                  Images (JPG, PNG, GIF) · PDF · JSON · Any file
-                </div>
-                <input ref={fileInputRef} type="file" multiple
-                  accept="image/*,.pdf,.json,.txt,.csv,.doc,.docx"
-                  onChange={handleFileInput}
-                  style={{ display: "none" }}
-                />
-              </div>
-
-              {/* Existing attachments */}
-              {existingAtts.map((att, i) => (
-                <div key={i} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  background: "rgba(255,255,255,0.8)",
-                  border: `1px solid ${c.border}44`,
-                  borderRadius: 12, padding: "10px 12px",
-                }}>
-                  {att.type?.startsWith("image/")
-                    ? <img src={att.url} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 8 }} />
-                    : <span style={{ fontSize: 28 }}>{fileIcon(att.type)}</span>
-                  }
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: "0.82rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{att.name}</div>
-                    <div style={{ fontSize: "0.7rem", color: "var(--muted)" }}>Saved · <a href={att.url} target="_blank" rel="noreferrer" style={{ color: c.border }}>View ↗</a></div>
-                  </div>
-                  <button onClick={() => removeExisting(i)} style={{
-                    background: "#fee2e2", border: "1px solid #fca5a5",
-                    borderRadius: 8, padding: "4px 8px", cursor: "pointer", fontSize: 13,
-                  }}>🗑</button>
-                </div>
-              ))}
-
-              {/* New files to upload */}
-              {files.map((file, i) => (
-                <div key={i} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  background: "rgba(255,255,255,0.8)",
-                  border: `1px solid ${c.border}66`,
-                  borderRadius: 12, padding: "10px 12px",
-                }}>
-                  {file.type.startsWith("image/")
-                    ? <img src={URL.createObjectURL(file)} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 8 }} />
-                    : <span style={{ fontSize: 28 }}>{fileIcon(file.type)}</span>
-                  }
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: "0.82rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</div>
-                    <div style={{ fontSize: "0.7rem", color: "var(--muted)" }}>
-                      {formatBytes(file.size)}
-                      {progress[i] !== undefined && (
-                        <span> · Uploading {progress[i]}%</span>
-                      )}
+              {!jsonData ? (
+                <>
+                  {/* Drop zone */}
+                  <div
+                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      border: `2px dashed ${dragOver ? c.border : c.border + "66"}`,
+                      borderRadius: 16, padding: "36px 20px",
+                      textAlign: "center", cursor: "pointer",
+                      background: dragOver ? c.border + "11" : "rgba(255,255,255,0.5)",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    <div style={{ fontSize: 40, marginBottom: 10 }}>{dragOver ? "⬇️" : "📋"}</div>
+                    <div style={{ fontWeight: 800, fontSize: "0.9rem", color: c.border }}>
+                      JSON file drag karo ya click karo
                     </div>
-                    {progress[i] !== undefined && (
-                      <div style={{ height: 3, background: "#e5e7eb", borderRadius: 10, marginTop: 4 }}>
-                        <div style={{ width: progress[i] + "%", height: "100%", background: c.border, borderRadius: 10, transition: "width 0.3s" }} />
-                      </div>
-                    )}
+                    <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: 4 }}>
+                      Sirf .json files · FREE (Firestore mein save hoga)
+                    </div>
+                    <input ref={fileInputRef} type="file" accept=".json,application/json"
+                      onChange={e => handleJsonFile(e.target.files[0])}
+                      style={{ display: "none" }}
+                    />
                   </div>
-                  <button onClick={() => removeNewFile(i)} style={{
-                    background: "#fee2e2", border: "1px solid #fca5a5",
-                    borderRadius: 8, padding: "4px 8px", cursor: "pointer", fontSize: 13,
-                  }}>×</button>
+
+                  {/* OR paste */}
+                  <div style={{ textAlign: "center", color: "var(--muted)", fontSize: "0.8rem", fontWeight: 700 }}>— YA —</div>
+                  <textarea
+                    placeholder={'JSON yahan paste karo...\n{\n  "key": "value"\n}'}
+                    rows={5}
+                    onChange={e => {
+                      if (e.target.value.trim()) handlePasteJson(e.target.value.trim());
+                    }}
+                    style={{
+                      border: `1.5px solid ${c.border}55`, borderRadius: 14,
+                      padding: "11px 14px",
+                      fontFamily: "'JetBrains Mono', monospace", fontSize: "0.82rem",
+                      background: "rgba(255,255,255,0.7)",
+                      outline: "none", resize: "vertical", color: "var(--ink)",
+                    }}
+                  />
+
+                  {jsonError && (
+                    <div style={{
+                      background: "#fee2e2", border: "1px solid #fca5a5",
+                      borderRadius: 10, padding: "9px 14px",
+                      fontSize: "0.8rem", color: "#dc2626", fontWeight: 700,
+                    }}>⚠️ {jsonError}</div>
+                  )}
+                </>
+              ) : (
+                // JSON loaded — show preview
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    background: "rgba(255,255,255,0.8)",
+                    border: `1px solid ${c.border}55`,
+                    borderRadius: 12, padding: "10px 14px",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 22 }}>📋</span>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: "0.85rem" }}>{jsonName}</div>
+                        <div style={{ fontSize: "0.7rem", color: "var(--muted)" }}>
+                          {(jsonData.length / 1024).toFixed(1)} KB · Firestore mein save hoga ✓
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={removeJson} style={{
+                      background: "#fee2e2", border: "1px solid #fca5a5",
+                      borderRadius: 8, padding: "5px 9px",
+                      cursor: "pointer", fontSize: 13,
+                    }}>🗑 Hata do</button>
+                  </div>
+
+                  {/* Toggle view */}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {["pretty", "raw"].map(m => (
+                      <button key={m} onClick={() => setJsonViewMode(m)} style={{
+                        padding: "4px 12px",
+                        background: jsonViewMode === m ? c.border : "rgba(255,255,255,0.5)",
+                        color: jsonViewMode === m ? "white" : c.border,
+                        border: `1px solid ${c.border}`,
+                        borderRadius: 8, fontSize: "0.75rem",
+                        fontWeight: 700, cursor: "pointer",
+                      }}>{m === "pretty" ? "🎨 Pretty" : "📄 Raw"}</button>
+                    ))}
+                  </div>
+
+                  <pre style={{
+                    background: "rgba(26,26,46,0.04)",
+                    border: `1px solid ${c.border}44`,
+                    borderRadius: 12, padding: "12px 14px",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: "0.78rem", color: "var(--ink)",
+                    maxHeight: 220, overflowY: "auto",
+                    whiteSpace: "pre-wrap", wordBreak: "break-all",
+                    lineHeight: 1.6,
+                  }}>
+                    {jsonViewMode === "pretty" ? prettyJson() : jsonData}
+                  </pre>
                 </div>
-              ))}
+              )}
             </div>
           )}
 
@@ -366,10 +368,10 @@ export default function NoteEditor({ note, user, onClose }) {
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <span style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 700 }}>Rang:</span>
             {COLORS.map((col, i) => (
-              <button key={i} onClick={() => setColorIdx(i)} title={col.name} style={{
+              <button key={i} title={col.name} onClick={() => setColorIdx(i)} style={{
                 width: 24, height: 24, borderRadius: "50%",
                 background: col.bg,
-                border: i === colorIdx ? `3px solid ${col.border}` : `2px solid ${col.border}66`,
+                border: i === colorIdx ? `3px solid ${col.border}` : `2px solid ${col.border}88`,
                 cursor: "pointer",
                 transform: i === colorIdx ? "scale(1.3)" : "scale(1)",
                 transition: "transform 0.15s",
@@ -392,26 +394,19 @@ export default function NoteEditor({ note, user, onClose }) {
             ))}
           </div>
 
-          {/* Save button */}
-          <button
-            onClick={handleSave}
-            disabled={saving || uploading}
-            style={{
-              background: saving || uploading ? "var(--muted)" : `linear-gradient(135deg, ${c.border}, ${c.border}cc)`,
-              color: "white", border: "none",
-              borderRadius: 14, padding: "13px",
-              fontFamily: "'Syne', sans-serif",
-              fontWeight: 800, fontSize: "0.97rem",
-              cursor: saving || uploading ? "not-allowed" : "pointer",
-              boxShadow: `0 4px 20px ${c.border}44`,
-              transition: "all 0.2s",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            }}
-          >
-            {uploading
-              ? <><span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span> Uploading...</>
-              : saving
-              ? <><span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span> Saving...</>
+          {/* Save */}
+          <button onClick={handleSave} disabled={saving} style={{
+            background: saving ? "var(--muted)" : `linear-gradient(135deg, ${c.border}, ${c.border}bb)`,
+            color: "white", border: "none", borderRadius: 14,
+            padding: "13px", fontFamily: "'Syne', sans-serif",
+            fontWeight: 800, fontSize: "0.97rem",
+            cursor: saving ? "not-allowed" : "pointer",
+            boxShadow: `0 4px 20px ${c.border}44`,
+            transition: "all 0.2s",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          }}>
+            {saving
+              ? <><span style={{ animation: "spin 0.8s linear infinite", display: "inline-block" }}>⟳</span> Saving...</>
               : "💾 Save Karo"
             }
           </button>
