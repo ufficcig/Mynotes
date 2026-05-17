@@ -1,13 +1,58 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,700;1,400&display=swap');
 
 :root {
-  --ink:       #1a1a2e;
-  --paper:     #f7f4ef;
-  --accent:    #e8622a;
-  --muted:     #8a8580;
-  --border:    #e8e4dd;
-  --shadow:    0 2px 20px rgba(26,26,46,0.08);
-  --shadow-lg: 0 8px 40px rgba(26,26,46,0.15);
+  --ink:        #1a1a2e;
+  --paper:      #f7f4ef;
+  --accent:     #e8622a;
+  --muted:      #8a8580;
+  --border:     #e8e4dd;
+  --card:       #ffffff;
+  --shadow:     0 2px 20px rgba(26,26,46,0.08);
+  --shadow-lg:  0 8px 40px rgba(26,26,46,0.15);
+  --header-bg:  rgba(247,244,239,0.95);
+  --input-bg:   #ffffff;
+  --sidebar-bg: #1a1a2e;
+
+  /* Highlight colors */
+  --hl-yellow:  #FFF3C4;
+  --hl-yellow-border: #F59E0B;
+  --hl-green:   #D1FAE5;
+  --hl-green-border:  #10B981;
+  --hl-blue:    #DBEAFE;
+  --hl-blue-border:   #3B82F6;
+  --hl-red:     #FEE2E2;
+  --hl-red-border:    #EF4444;
+  --hl-purple:  #EDE9FE;
+  --hl-purple-border: #8B5CF6;
+
+  /* Formula card */
+  --formula-bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  --formula-border: #3B82F6;
+}
+
+[data-theme="dark"] {
+  --ink:        #e8e4dd;
+  --paper:      #0f0f1a;
+  --accent:     #f0793a;
+  --muted:      #6b6760;
+  --border:     #2a2a3e;
+  --card:       #1a1a2e;
+  --shadow:     0 2px 20px rgba(0,0,0,0.3);
+  --shadow-lg:  0 8px 40px rgba(0,0,0,0.4);
+  --header-bg:  rgba(15,15,26,0.97);
+  --input-bg:   #1a1a2e;
+  --sidebar-bg: #0a0a14;
+
+  --hl-yellow:  #2a1f00;
+  --hl-yellow-border: #F59E0B;
+  --hl-green:   #001a0d;
+  --hl-green-border:  #10B981;
+  --hl-blue:    #00102a;
+  --hl-blue-border:   #3B82F6;
+  --hl-red:     #2a0000;
+  --hl-red-border:    #EF4444;
+  --hl-purple:  #150028;
+  --hl-purple-border: #8B5CF6;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -18,15 +63,228 @@ body {
   color: var(--ink);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  transition: background 0.3s, color 0.3s;
 }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 ::selection { background: var(--accent); color: white; }
 
-.katex-display { overflow-x: auto; padding: 8px 0; }
-.katex { font-size: 1.05em !important; }
+/* ── KaTeX ── */
+.katex-display { overflow-x: auto; padding: 4px 0; }
+.katex { font-size: 1.1em !important; }
 
+/* ── Rich content styling in ReadMode ── */
+.rich-content {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.05rem;
+  line-height: 1.95;
+  color: var(--ink);
+}
+
+/* Headings */
+.rich-content .h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--subject-color, var(--accent));
+  margin: 24px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--subject-color, var(--accent));
+  line-height: 1.3;
+}
+.rich-content .h2 {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--subject-color, var(--ink));
+  margin: 20px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rich-content .h2::before {
+  content: '';
+  width: 4px; height: 20px;
+  background: var(--subject-color, var(--accent));
+  border-radius: 4px;
+  display: inline-block;
+}
+.rich-content .h3 {
+  font-family: 'Syne', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin: 16px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Highlight blocks */
+.rich-content .hl-yellow {
+  background: var(--hl-yellow);
+  border-left: 4px solid var(--hl-yellow-border);
+  border-radius: 0 12px 12px 0;
+  padding: 10px 14px;
+  margin: 10px 0;
+  font-style: italic;
+}
+.rich-content .hl-green {
+  background: var(--hl-green);
+  border-left: 4px solid var(--hl-green-border);
+  border-radius: 0 12px 12px 0;
+  padding: 10px 14px;
+  margin: 10px 0;
+}
+.rich-content .hl-blue {
+  background: var(--hl-blue);
+  border-left: 4px solid var(--hl-blue-border);
+  border-radius: 0 12px 12px 0;
+  padding: 10px 14px;
+  margin: 10px 0;
+}
+.rich-content .hl-red {
+  background: var(--hl-red);
+  border-left: 4px solid var(--hl-red-border);
+  border-radius: 0 12px 12px 0;
+  padding: 10px 14px;
+  margin: 10px 0;
+}
+.rich-content .hl-purple {
+  background: var(--hl-purple);
+  border-left: 4px solid var(--hl-purple-border);
+  border-radius: 0 12px 12px 0;
+  padding: 10px 14px;
+  margin: 10px 0;
+}
+
+/* Formula card */
+.rich-content .formula-card {
+  background: var(--formula-bg);
+  border: 1.5px solid var(--formula-border);
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin: 14px 0;
+  box-shadow: 0 4px 20px rgba(59,130,246,0.2);
+  position: relative;
+  overflow: hidden;
+}
+.rich-content .formula-card::before {
+  content: '∫';
+  position: absolute;
+  right: 14px; top: 8px;
+  font-size: 3rem;
+  color: rgba(59,130,246,0.15);
+  font-family: 'JetBrains Mono', monospace;
+  pointer-events: none;
+}
+.rich-content .formula-card .formula-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #60A5FA;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.rich-content .formula-card .katex,
+.rich-content .formula-card .katex-display {
+  color: white !important;
+}
+.rich-content .formula-card .katex-display {
+  padding: 0;
+}
+
+/* Inline highlight ==text== */
+.rich-content mark {
+  background: linear-gradient(120deg, #FFF3C4 0%, #FDE68A 100%);
+  color: #92400E;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-style: normal;
+}
+
+/* Definition/Important box */
+.rich-content .def-box {
+  background: linear-gradient(135deg, #EDE9FE, #DDD6FE);
+  border: 1.5px solid #8B5CF6;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin: 12px 0;
+  position: relative;
+}
+.rich-content .def-box .def-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 900;
+  color: #6D28D9;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+[data-theme="dark"] .rich-content .def-box {
+  background: linear-gradient(135deg, #150028, #1a0035);
+  border-color: #8B5CF6;
+}
+[data-theme="dark"] .rich-content .def-box .def-label { color: #A78BFA; }
+
+/* Remember box */
+.rich-content .remember-box {
+  background: linear-gradient(135deg, #FFF7ED, #FEE0C0);
+  border: 1.5px solid #F59E0B;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin: 12px 0;
+}
+.rich-content .remember-box .remember-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 900;
+  color: #D97706;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+[data-theme="dark"] .rich-content .remember-box {
+  background: linear-gradient(135deg, #2a1500, #2a1800);
+  border-color: #F59E0B;
+}
+
+/* SVG diagram box */
+.rich-content .diagram-box {
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  margin: 14px 0;
+  background: var(--card);
+  text-align: center;
+}
+.rich-content .diagram-box .diagram-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 10px;
+}
+
+/* Bullet points */
+.rich-content .bullet {
+  display: flex;
+  gap: 10px;
+  margin: 5px 0;
+  align-items: flex-start;
+}
+.rich-content .bullet::before {
+  content: '▸';
+  color: var(--subject-color, var(--accent));
+  font-size: 0.8rem;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+/* Animations */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -39,4 +297,13 @@ body {
 @keyframes popIn {
   from { opacity: 0; transform: scale(0.9) translateY(20px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes starPop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.5) rotate(20deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to   { background-position: 200% center; }
 }
