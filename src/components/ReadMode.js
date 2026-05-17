@@ -143,7 +143,7 @@ export default function ReadMode({ note, onClose, onEdit, dark }) {
           <span># Title</span>
           <span>## Heading</span>
           <span>!!highlight!!</span>
-          <span>:::formula:\frac{{a}}{{b}}:::</span>
+          <span>{":::formula:\\frac{a}{b}:::"}</span>
           <span>:::def:text:::</span>
           <span>:::diagram:concave-mirror:::</span>
           <span>==mark==</span>
