@@ -223,7 +223,7 @@ export const DIAGRAMS = {
 //   $formula$       → inline math
 //   $$formula$$     → block math
 
-export function parseRichContent(text, subjectColor) {
+function parseRichContent(text, subjectColor) {
   if (!text) return "";
   const sc = subjectColor || "#e8622a";
 
