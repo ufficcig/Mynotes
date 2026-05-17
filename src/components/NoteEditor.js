@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { addDoc, updateDoc, doc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
-import { parseRichContent } from "../richContent";
+import  parseRichContent  from "../richContent";
 
 const CLASSES  = ["Class 9","Class 10","Class 11","Class 12"];
 const SUBJECTS = ["Maths","Hindi","English","Physics","Chemistry","Biology"];
