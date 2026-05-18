@@ -131,23 +131,7 @@ export default function ReadMode({ note, onClose, onEdit, dark }) {
           )}
         </div>
 
-        {/* Syntax hint */}
-        <div style={{
-          padding:"10px 18px",
-          borderTop:`1px solid ${borderClr}`,
-          background: dark ? "rgba(255,255,255,0.02)" : "#fafaf8",
-          display:"flex", gap:12, flexWrap:"wrap",
-          fontSize:"0.65rem", color:"var(--muted)",
-          fontFamily:"'JetBrains Mono',monospace",
-        }}>
-          <span># Title</span>
-          <span>## Heading</span>
-          <span>!!highlight!!</span>
-          <span>{":::formula:\\frac{a}{b}:::"}</span>
-          <span>:::def:text:::</span>
-          <span>:::diagram:concave-mirror:::</span>
-          <span>==mark==</span>
-        </div>
+
       </div>
     </div>
   );
