@@ -1,6 +1,77 @@
 import { useEffect, useRef } from "react";
 import parseRichContent from "../richContent";
 
+// ── Print/PDF styles ──────────────────────────────────────────────────────────
+const PRINT_STYLE = `
+@media print {
+  body > *:not(#print-area) { display: none !important; }
+  #print-area {
+    display: block !important;
+    position: fixed; inset: 0;
+    background: white; color: #1a1a2e;
+    padding: 32px 40px; overflow: auto;
+    font-family: 'Instrument Serif', serif;
+    font-size: 13pt; line-height: 1.9;
+    z-index: 99999;
+  }
+  #print-area h1 { font-family: 'Playfair Display', serif; font-size: 22pt; font-weight: 700; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid currentColor; }
+  #print-area .h1 { font-size: 16pt; font-weight: 700; margin: 18px 0 8px; font-family: 'Playfair Display', serif; }
+  #print-area .h2 { font-size: 13pt; font-weight: 800; margin: 14px 0 6px; font-family: 'Syne', sans-serif; }
+  #print-area .h2::before { content: ''; display: inline-block; width: 4px; height: 16px; background: currentColor; margin-right: 8px; border-radius: 4px; vertical-align: middle; }
+  #print-area .h3 { font-size: 10pt; font-weight: 700; text-transform: uppercase; color: #888; margin: 10px 0 4px; letter-spacing: 0.5px; }
+  #print-area .bullet { display: flex; gap: 8px; margin: 4px 0; }
+  #print-area .bullet::before { content: '▸'; flex-shrink: 0; }
+  #print-area .formula-card { background: #1a1a2e !important; color: white !important; border-radius: 12px; padding: 14px 18px; margin: 12px 0; break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #print-area .formula-label { font-size: 8pt; font-family: 'Syne', sans-serif; font-weight: 800; color: #60A5FA !important; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+  #print-area .def-box { border-left: 4px solid #8B5CF6; padding: 10px 14px; margin: 10px 0; background: #F5F3FF !important; border-radius: 0 10px 10px 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #print-area .remember-box { border-left: 4px solid #F59E0B; padding: 10px 14px; margin: 10px 0; background: #FFFBEB !important; border-radius: 0 10px 10px 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #print-area .hl-yellow { background: #FFF3C4 !important; border-left: 4px solid #F59E0B; padding: 8px 12px; margin: 6px 0; border-radius: 0 8px 8px 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #print-area .hl-green  { background: #D1FAE5 !important; border-left: 4px solid #10B981; padding: 8px 12px; margin: 6px 0; border-radius: 0 8px 8px 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #print-area .hl-blue   { background: #DBEAFE !important; border-left: 4px solid #3B82F6; padding: 8px 12px; margin: 6px 0; border-radius: 0 8px 8px 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #print-area .hl-red    { background: #FEE2E2 !important; border-left: 4px solid #EF4444; padding: 8px 12px; margin: 6px 0; border-radius: 0 8px 8px 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #print-area .diagram-box { border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 14px; margin: 12px 0; text-align: center; break-inside: avoid; }
+  #print-area mark { background: #FEF08A !important; padding: 1px 4px; border-radius: 3px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #print-area .katex-display { margin: 10px 0; overflow-x: auto; }
+  .print-meta { font-family: 'Syne', sans-serif; font-size: 9pt; color: #666; margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .print-meta span { border: 1px solid #e5e7eb; padding: 2px 10px; border-radius: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { margin: 18mm; size: A4; }
+}
+`;
+
+function injectPrintStyle() {
+  if (document.getElementById("mynotes-print-style")) return;
+  const s = document.createElement("style");
+  s.id = "mynotes-print-style";
+  s.textContent = PRINT_STYLE;
+  document.head.appendChild(s);
+}
+
+function printNote(note, contentHTML, subjectColor) {
+  injectPrintStyle();
+  let el = document.getElementById("print-area");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "print-area";
+    el.style.display = "none";
+    document.body.appendChild(el);
+  }
+  const timeStr = note.updatedAt?.toDate
+    ? note.updatedAt.toDate().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
+    : "";
+  el.innerHTML = `
+    <div class="print-meta">
+      ${note.className ? `<span>🏫 ${note.className}</span>` : ""}
+      ${note.subject  ? `<span style="background:${subjectColor}22;color:${subjectColor};border-color:${subjectColor}44">📚 ${note.subject}</span>` : ""}
+      ${note.chapter  ? `<span>📖 ${note.chapter}</span>` : ""}
+      ${note.important ? `<span style="background:#FFF7ED;color:#D97706;border-color:#F59E0B44">⭐ Important</span>` : ""}
+      ${timeStr ? `<span>📅 ${timeStr}</span>` : ""}
+    </div>
+    ${note.title ? `<h1 style="color:${subjectColor}">${note.title}</h1>` : ""}
+    <div class="rich-content" style="--subject-color:${subjectColor}">${contentHTML}</div>
+  `;
+  window.print();
+}
+
 const SUBJECT_COLORS = {
   "Maths":     "#3B82F6",
   "Hindi":     "#F59E0B",
@@ -78,6 +149,11 @@ export default function ReadMode({ note, onClose, onEdit, dark }) {
             border:"none", borderRadius:10, padding:"7px 14px",
             fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:"0.78rem", cursor:"pointer",
           }}>✏️ Edit</button>
+          <button onClick={() => printNote(note, contentRef.current?.innerHTML || "", subjectColor)} style={{
+            background: subjectColor, color:"white",
+            border:"none", borderRadius:10, padding:"7px 14px",
+            fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:"0.78rem", cursor:"pointer",
+          }}>📄 PDF</button>
           <button onClick={onClose} style={{
             background: dark ? "rgba(255,255,255,0.08)" : "#f5f5f5",
             border:"none", borderRadius:10, padding:"7px 12px",
